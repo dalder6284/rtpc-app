@@ -15,6 +15,17 @@ pub struct SessionConfig {
     pub columns: usize,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct SessionSaveState {
+    pub config: SessionConfig,
+    pub selected_file: Option<SelectedFile>,
+    pub rnbo_patches: Vec<RNBOPaletteItem>,
+    pub sheet_music: Vec<SheetPaletteItem>,
+    pub phases: HashMap<String, Phase>,
+    pub current_phase_id: Option<String>,
+}
+
+
 //
 // Palette Item
 //
@@ -50,10 +61,9 @@ pub struct SelectedFile {
 //
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Assignment {
-    pub seat_id: String,
-    pub file_id: String,
-    pub file_type: String,
+pub struct SeatAssignment {
+    pub rnbo_id: Option<String>,
+    pub sheet_id: Option<String>,
 }
 
 //
@@ -66,6 +76,7 @@ pub struct PhaseInit {
     pub name: String,
     pub bpm: u32,
     pub count_in: u32,
+    pub index: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,9 +90,10 @@ pub struct PhaseUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Phase {
     pub name: String,
-    pub assignments: Vec<Assignment>,
+    pub assignments: Vec<SeatAssignment>,
     pub bpm: u32,
     pub count_in: u32,
+    pub index: usize,
 }
 
 //

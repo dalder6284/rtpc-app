@@ -5,9 +5,13 @@ import "./index.css";
 
 import MainPage from "./pages/MainPage";
 import SessionPage from "./pages/SessionPage";
+import SyncPage from "./pages/SyncPage";
 
 // 👇 Add this import
 import { ThemeProvider } from "@/components/ui/theme-provider";
+import { Toaster } from "sonner"
+
+
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
@@ -16,7 +20,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <Routes>
           <Route path="/" element={<MainPage />} />
           <Route path="/session" element={<SessionPage />} />
+          <Route path="/sync" element={<SyncPage />} />
         </Routes>
+        <Toaster richColors position="bottom-right" />
       </BrowserRouter>
     </ThemeProvider>
   </React.StrictMode>,

@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom"
 
 import { StartNewSessionDialog } from "@/components/mainPage/StartNewSessionDialog"
 import { invoke } from "@tauri-apps/api/core"
+import { open } from "@tauri-apps/plugin-dialog"
+
 
 
 
@@ -36,6 +38,23 @@ export default function MainPage() {
       // Optionally show an error message to the user
     }
   }
+
+  const handleLoadConfig = async () => {
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }]
+      })
+  
+      if (typeof path !== "string") return // user canceled
+  
+      await invoke("load_session_from_file", { path })
+      navigate("/session")
+    } catch (err) {
+      console.error("Failed to load session:", err)
+    }
+  }
+  
 
   useEffect(() => {
     if (!vantaEffect && vantaRef.current) {
@@ -92,7 +111,7 @@ export default function MainPage() {
           <Button variant="secondary" className="w-full shadow-none" onClick={() => setDialogOpen(true)}>
             Start New Session
           </Button>
-          <Button variant="secondary" className="w-full shadow-none">
+          <Button variant="secondary" className="w-full shadow-none" onClick={handleLoadConfig}>
             Load Config File
           </Button>
         </CardContent>

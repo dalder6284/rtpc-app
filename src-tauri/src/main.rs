@@ -28,7 +28,18 @@ fn main() {
             add_sheet_file,
             remove_sheet_file,
             select_palette_file,
-            clear_selected_file
+            clear_selected_file,
+            assign_selected_file_to_seat,
+            unassign_file_from_seat,
+            get_selected_file,
+            get_assignments_for_phase,
+            get_rnbo_item,
+            get_sheet_item,
+            save_session_to_file,
+            load_session_from_file,
+            get_app_state,
+
+            start_server,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running Tauri application.");

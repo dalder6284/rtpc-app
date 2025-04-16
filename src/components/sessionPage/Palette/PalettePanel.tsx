@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
@@ -68,6 +68,25 @@ export default function PalettePanel() {
   //   }
   // }
 
+  useEffect(() => {
+    const loadPaletteItems = async () => {
+      try {
+        const state = await invoke<{
+          rnbo_patches: RNBOPaletteItem[]
+          sheet_music: SheetPaletteItem[]
+        }>("get_app_state")
+
+        setRnboItems(state.rnbo_patches)
+        setSheetItems(state.sheet_music)
+      } catch (err) {
+        console.error("Failed to load palette items:", err)
+      }
+    }
+
+    loadPaletteItems()
+  }, [])
+
+
   const handleSubmit = async (item: {
     type: "rnbo" | "sheet"
     label: string
@@ -113,7 +132,7 @@ export default function PalettePanel() {
 
   const handleSelect = async (type: "rnbo" | "sheet", id: string) => {
     const alreadySelected = selected?.type === type && selected.id === id
-  
+
     if (alreadySelected) {
       try {
         await invoke("clear_selected_file")
@@ -124,13 +143,14 @@ export default function PalettePanel() {
     } else {
       try {
         await invoke("select_palette_file", { id, fileType: type })
+        console.log(type);
         setSelected({ type, id })
       } catch (err) {
         console.error("Failed to select file:", err)
       }
     }
   }
-  
+
 
   const handleDelete = async (type: "rnbo" | "sheet", id: string) => {
     try {
