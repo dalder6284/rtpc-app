@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
+import { invoke } from "@tauri-apps/api/core"
 
 import {
     AlertDialog,
@@ -30,24 +31,70 @@ export default function PhaseConfigurationPanel() {
     const [phaseToDelete, setPhaseToDelete] = useState<Phase | null>(null)
     const [editingId, setEditingId] = useState<string | null>(null)
 
-    const handleAddPhase = () => {
+    const [bpmInputs, setBpmInputs] = useState<Record<string, string>>({});
+    const [countInInputs, setCountInInputs] = useState<Record<string, string>>({});
+
+
+    const handleAddPhase = async () => {
         const newPhase: Phase = {
             id: crypto.randomUUID(),
             name: `Phase ${phases.length + 1}`,
             bpm: 120,
             countIn: 4,
         }
-        setPhases([...phases, newPhase])
-        setOpenPhase(newPhase.id)
+
+        try {
+            await invoke("add_phase", { data: newPhase })
+            await invoke("set_current_phase", { phaseId: newPhase.id })
+
+            // Only update state if Rust accepted the insert
+            setPhases([...phases, newPhase])
+            setOpenPhase(newPhase.id)
+            
+            
+        } catch (err) {
+            console.error("Failed to add phase:", err)
+            // optionally show user feedback here
+        }
     }
 
-    const updatePhase = (id: string, updates: Partial<Phase>) => {
+    const updatePhase = async (id: string, updates: Partial<Phase>) => {
+        // Optimistically update local state
         setPhases(phases.map(p => (p.id === id ? { ...p, ...updates } : p)))
+
+        try {
+            await invoke("edit_phase", {
+                phaseId: id,
+                updates: updates
+            })
+        } catch (err) {
+            console.error("Failed to sync phase update to backend:", err)
+            // Optional: rollback local update or show error UI
+        }
     }
 
-    const deletePhase = (id: string) => {
-        setPhases(phases.filter(p => p.id !== id))
-        if (openPhase === id) setOpenPhase(undefined)
+    const deletePhase = async (id: string) => {
+        try {
+            await invoke("remove_phase", { phaseId: id }) // must match Rust param name
+
+            // Only update local state if successful
+            setPhases(phases.filter(p => p.id !== id))
+            if (openPhase === id) setOpenPhase(undefined)
+        } catch (err) {
+            console.error("Failed to remove phase:", err)
+            // Optionally show a toast or alert here
+        }
+    }
+
+    const handleOnValueChange = (val: string) => {
+        setOpenPhase(val) // val is the currently open phase ID, or undefined
+        console.log("Selected phase ID:", val)
+        // Optionally sync to Rust
+        if (val) {
+            invoke("set_current_phase", { phaseId: val })
+        } else {
+            invoke("clear_current_phase") // optional, if you want to clear it
+        }
     }
 
     return (
@@ -57,7 +104,7 @@ export default function PhaseConfigurationPanel() {
                 <Button size="sm" variant="outline" onClick={handleAddPhase}>+ Add</Button>
             </div>
 
-            <Accordion type="single" collapsible value={openPhase} onValueChange={setOpenPhase} className="space-y-2">
+            <Accordion type="single" collapsible value={openPhase} onValueChange={handleOnValueChange} className="space-y-2">
                 {phases.map((phase) => (
                     <AccordionItem key={phase.id} value={phase.id} className="border-none px-3 py-1">
                         <AccordionTrigger className="text-sm font-medium pr-1 py-1 min-h-0 h-auto">
@@ -83,10 +130,9 @@ export default function PhaseConfigurationPanel() {
                                         setEditingId(null)
                                     }}
                                     onChange={(e) => {
-                                        const value = e.target.value
-                                        updatePhase(phase.id, { name: value.length === 0 ? "" : value })
+                                        const newName = e.target.value;
+                                        updatePhase(phase.id, { name: newName });
                                     }}
-
                                 />
                             ) : (
                                 <div
@@ -108,9 +154,41 @@ export default function PhaseConfigurationPanel() {
                                 <Label htmlFor={`bpm-${phase.id}`} className="text-xs text-zinc-400">BPM</Label>
                                 <Input
                                     id={`bpm-${phase.id}`}
-                                    type="number"
-                                    value={phase.bpm}
-                                    onChange={(e) => updatePhase(phase.id, { bpm: parseInt(e.target.value) || 0 })}
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={bpmInputs[phase.id] ?? phase.bpm.toString()}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+
+                                        // Allow only digits or empty string
+                                        if (/^\d*$/.test(raw)) {
+                                            setBpmInputs({ ...bpmInputs, [phase.id]: raw });
+
+                                            const parsed = parseInt(raw, 10);
+
+                                            // Only update if parsed is at least 1
+                                            if (!isNaN(parsed) && parsed >= 1) {
+                                                updatePhase(phase.id, { bpm: parsed });
+                                            }
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        const raw = bpmInputs[phase.id];
+
+                                        let parsed = parseInt(raw ?? "", 10);
+                                        if (isNaN(parsed) || parsed < 1) {
+                                            parsed = 1; // fallback to 1 if invalid or too small
+                                        }
+
+                                        updatePhase(phase.id, { bpm: parsed });
+
+                                        // Clear the temp input state to re-sync with phase.bpm
+                                        setBpmInputs((prev) => {
+                                            const newInputs = { ...prev };
+                                            delete newInputs[phase.id];
+                                            return newInputs;
+                                        });
+                                    }}
                                 />
                             </div>
 
@@ -118,10 +196,43 @@ export default function PhaseConfigurationPanel() {
                                 <Label htmlFor={`countin-${phase.id}`} className="text-xs text-zinc-400">Count-In (beats)</Label>
                                 <Input
                                     id={`countin-${phase.id}`}
-                                    type="number"
-                                    value={phase.countIn}
-                                    onChange={(e) => updatePhase(phase.id, { countIn: parseInt(e.target.value) || 0 })}
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={countInInputs[phase.id] ?? phase.countIn.toString()}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+
+                                        // Allow only digits or empty string
+                                        if (/^\d*$/.test(raw)) {
+                                            setCountInInputs({ ...countInInputs, [phase.id]: raw });
+
+                                            const parsed = parseInt(raw, 10);
+
+                                            // Only update if parsed is at least 1
+                                            if (!isNaN(parsed) && parsed >= 1) {
+                                                updatePhase(phase.id, { countIn: parsed });
+                                            }
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        const raw = countInInputs[phase.id];
+                                        let parsed = parseInt(raw ?? "", 10);
+
+                                        if (isNaN(parsed) || parsed < 1) {
+                                            parsed = 1;
+                                        }
+
+                                        updatePhase(phase.id, { countIn: parsed });
+
+                                        // Clear temp state
+                                        setCountInInputs((prev) => {
+                                            const newInputs = { ...prev };
+                                            delete newInputs[phase.id];
+                                            return newInputs;
+                                        });
+                                    }}
                                 />
+
                             </div>
 
                             <div className="pt-3 border-t border-zinc-800">

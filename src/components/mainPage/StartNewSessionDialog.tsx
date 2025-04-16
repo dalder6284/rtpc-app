@@ -9,42 +9,66 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { save } from '@tauri-apps/plugin-dialog'
+
 
 interface StartNewSessionDialogProps {
-  open: boolean
+  isOpen: boolean
   setOpen: (value: boolean) => void
   onSubmit: (data: {
     name: string
     path: string
-    size: number
+    rows: number
+    columns: number
   }) => void
 }
 
 export function StartNewSessionDialog({
-  open,
+  isOpen,
   setOpen,
   onSubmit
 }: StartNewSessionDialogProps) {
   const [name, setName] = useState("")
   const [path, setPath] = useState("")
-  const [audienceSize, setAudienceSize] = useState("")
+  const [rows, setRows] = useState("5")
+  const [columns, setColumns] = useState("5")
+
+
 
   const handleSubmit = () => {
-    if (!name || !path || !audienceSize) return
-    const size = parseInt(audienceSize)
+    if (!name || !path || !rows || !columns) return
+
+    const r = Math.min(8, Math.max(1, parseInt(rows)))
+    const c = Math.min(8, Math.max(1, parseInt(columns)))
+    const size = r * c
+
     if (isNaN(size) || size <= 0) return
 
-    onSubmit({ name, path, size })
+    onSubmit({ name: name, path: path, rows: r, columns: c })
     setOpen(false)
 
-    // Optionally reset fields
+    // Optionally reset
     setName("")
     setPath("")
-    setAudienceSize("")
+    setRows("5")
+    setColumns("5")
+  }
+
+  const handleChoosePath = async () => {
+    const selected = await save({
+      filters: [
+        { name: "JSON", extensions: ["json"] }
+      ],
+      defaultPath: "session-config.json"
+    })
+  
+    if (selected) {
+      setPath(selected)
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Start New Session</DialogTitle>
@@ -64,23 +88,44 @@ export function StartNewSessionDialog({
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="json-path" className="text-right">Save Location</Label>
+            <div className="col-span-3 flex gap-2">
+              <Input
+                id="json-path"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                placeholder="Choose a file..."
+                className="flex-1"
+              />
+              <Button variant="outline" onClick={handleChoosePath}>
+                Browse
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="rows" className="text-right">Rows</Label>
             <Input
-              id="json-path"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="e.g. /sessions/my-session.json"
+              id="rows"
+              type="number"
+              min={1}
+              max={8}
+              value={rows}
+              onChange={(e) => setRows(e.target.value)}
+              placeholder="e.g. 5"
               className="col-span-3"
             />
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="audience-size" className="text-right">Audience Size</Label>
+            <Label htmlFor="columns" className="text-right">Columns</Label>
             <Input
-              id="audience-size"
+              id="columns"
               type="number"
-              value={audienceSize}
-              onChange={(e) => setAudienceSize(e.target.value)}
-              placeholder="e.g. 25"
+              min={1}
+              max={8}
+              value={columns}
+              onChange={(e) => setColumns(e.target.value)}
+              placeholder="e.g. 5"
               className="col-span-3"
             />
           </div>

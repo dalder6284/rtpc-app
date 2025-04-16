@@ -6,6 +6,7 @@ import * as THREE from "three"
 import { useNavigate } from "react-router-dom"
 
 import { StartNewSessionDialog } from "@/components/mainPage/StartNewSessionDialog"
+import { invoke } from "@tauri-apps/api/core"
 
 
 
@@ -15,10 +16,25 @@ export default function MainPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const navigate = useNavigate()
 
-  const handleStartNewSession = (data: { name: string; path: string; size: number }) => {
-    console.log("Session created:", data)
-    // In the future, you'll write this to disk in Rust
-    navigate("/session")  // Navigate after successful creation
+  const handleStartNewSession = async (data: {
+    name: string
+    path: string
+    rows: number
+    columns: number
+  }) => {
+    console.log("Submitting session config to Rust:", data)
+  
+    try {
+      await invoke("set_session_config", {
+        config: data
+      })
+      navigate("/session")
+      
+      // Navigate after success
+    } catch (err) {
+      console.error("Failed to set session config:", err)
+      // Optionally show an error message to the user
+    }
   }
 
   useEffect(() => {
@@ -70,7 +86,7 @@ export default function MainPage() {
         <CardContent className="flex flex-col gap-4 mt-6 mb-8">
           <StartNewSessionDialog
             onSubmit={handleStartNewSession}
-            open={dialogOpen}
+            isOpen={dialogOpen}
             setOpen={setDialogOpen}
           />
           <Button variant="secondary" className="w-full shadow-none" onClick={() => setDialogOpen(true)}>

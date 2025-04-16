@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { AddPaletteDialog } from "./AddPaletteDialog"
+
 
 type PaletteItem = {
   id: string

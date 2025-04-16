@@ -15,7 +15,7 @@ export default function SessionPage() {
     <div className="h-screen w-screen bg-background text-foreground">
       <ResizablePanelGroup direction="horizontal" className="h-full border border-zinc-700 overflow-hidden">
         {/* Left Panel: Phase Configuration */}
-        <ResizablePanel defaultSize={18} minSize={12} className="bg-zinc-900">
+        <ResizablePanel defaultSize={24} minSize={12} className="bg-zinc-900">
           <div className="h-full w-full p-4 flex flex-col">
             <PhaseConfigurationPanel />
           </div>
