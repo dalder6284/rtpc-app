@@ -74,7 +74,7 @@ This system was developed as part of an undergraduate thesis project at Yale Uni
 ![QR Code Screen](figs/qr-screen.png)  
 **Figure 4:** QR code display for mobile client onboarding. Clients use their browsers to connect to the RTPC web session.
 
-![Mobile Join Screen](figs/mobile-home.png)  
+<img src="figs/mobile-home.png" alt="Mobile Join Screen" width="300" />  
 **Figure 5:** Mobile client login screen for audience members to enter their assigned seat number and begin synchronization.
 
 ### Synchronization Results
