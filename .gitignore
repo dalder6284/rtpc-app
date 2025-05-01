@@ -51,3 +51,5 @@ Thumbs.db
 
 src-tauri/certs/cert.pem
 src-tauri/certs/key.pem
+frontend/cert.pem
+frontend/key.pem
