@@ -1,7 +1,11 @@
-use crate::state::*;
+pub mod state;
+
+use crate::design_commands::state::*;
 use std::fs;
 use std::path::PathBuf;
 use tauri::{Emitter, State};
+
+
 
 //
 // Session Config
@@ -394,7 +398,7 @@ pub fn select_palette_file(
 pub fn clear_selected_file(state: tauri::State<AppState>) -> Result<(), String> {
     let mut selected = state.selected_file.lock().map_err(|_| "Lock error")?;
     *selected = None;
-
+    
     println!("Selected file cleared.");
     Ok(())
 }
@@ -492,13 +496,4 @@ pub fn get_sheet_item(
     .find(|item| item.id == id)
     .cloned()
     .ok_or_else(|| format!("No sheet item found with id {}", id))
-}
-
-//
-// Server
-//
-
-#[tauri::command]
-pub fn start_server() {
-    println!("Starting server!");
 }

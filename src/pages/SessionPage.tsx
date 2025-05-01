@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom"
 import { useState } from "react"
-import { invoke } from "@tauri-apps/api/core"
 
 import {
   ResizablePanel,
@@ -33,8 +32,8 @@ export default function SessionPage() {
 
   const handleConfirmStartServer = async () => {
     try {
-      await invoke("start_server")
-      navigate("/sync")
+      // await invoke("start_server")
+      navigate("/join")
     } catch (err) {
       console.error("Failed to start server:", err)
       alert("Failed to start the server.")

@@ -5,7 +5,7 @@ import "./index.css";
 
 import MainPage from "./pages/MainPage";
 import SessionPage from "./pages/SessionPage";
-import SyncPage from "./pages/SyncPage";
+import JoinPage from "./pages/JoinPage";
 
 // 👇 Add this import
 import { ThemeProvider } from "@/components/ui/theme-provider";
@@ -20,7 +20,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <Routes>
           <Route path="/" element={<MainPage />} />
           <Route path="/session" element={<SessionPage />} />
-          <Route path="/sync" element={<SyncPage />} />
+          <Route path="/join" element={<JoinPage />} />
         </Routes>
         <Toaster richColors position="bottom-right" />
       </BrowserRouter>

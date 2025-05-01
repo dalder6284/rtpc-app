@@ -1,11 +1,14 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod state;
-mod commands;
+mod design_commands;
+mod server_commands;
+
 
 use state::AppState;
-use commands::*;
+use server_controller::ServerManager;
+use design_commands::*;
+use server_commands::*;
 
 use tauri_plugin_dialog;
 
@@ -14,6 +17,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(ServerManager::default())
         .invoke_handler(tauri::generate_handler![
             set_session_config,
             get_session_config,
@@ -40,6 +44,9 @@ fn main() {
             get_app_state,
 
             start_server,
+            stop_server,
+            get_local_ip,
+            broadcast_json,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running Tauri application.");

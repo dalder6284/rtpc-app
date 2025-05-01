@@ -49,3 +49,5 @@ Thumbs.db
 *.bak
 *.old
 
+src-tauri/certs/cert.pem
+src-tauri/certs/key.pem
