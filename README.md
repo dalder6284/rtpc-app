@@ -60,8 +60,26 @@ This system was developed as part of an undergraduate thesis project at Yale Uni
 
 ## Figures
 
-<!-- You can insert image links like below after uploading -->
-<!-- ![System Architecture](figures/system-architecture.png) -->
-<!-- ![Administrator Interface](figures/admin-interface.png) -->
+### System Overview
+![System Architecture](figs/system-stages.png)  
+**Figure 1:** Diagram of the RTPC system architecture, showing its three-stage lifecycle: session configuration, synchronization, and performance. Each stage highlights the interaction between the Tauri backend, React frontend, and mobile clients.
 
-(Add figures below this line as needed.)
+### Application Interface
+![Start Screen](figs/start-screen.png)  
+**Figure 2:** RTPC application start screen where the performer can launch a new session or load a saved one.
+
+![Configuration Screen](figs/config-screen.png)  
+**Figure 3:** Administrator interface with audience layout, BPM and phase controls, and palette assignment of RNBO patches and sheet music.
+
+![QR Code Screen](figs/qr-screen.png)  
+**Figure 4:** QR code display for mobile client onboarding. Clients use their browsers to connect to the RTPC web session.
+
+![Mobile Join Screen](figs/mobile-home.png)  
+**Figure 5:** Mobile client login screen for audience members to enter their assigned seat number and begin synchronization.
+
+### Synchronization Results
+![RTT Plot](figs/rtt_plot.png)  
+**Figure 6:** RTT samples over time during coarse synchronization. After 142 samples, RTT stabilized to 9.0 ms, allowing for a coarse synchronization tolerance of 4.5 ms.
+
+![Two-Tone Spectrogram](figs/rtt_two_tone.png)  
+**Figure 7:** Spectrograms of three playback events recorded from two mobile clients with 10 ms and 9 ms RTTs. Despite slight network differences, tones remain visibly and audibly aligned across all events.
