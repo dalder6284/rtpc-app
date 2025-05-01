@@ -9,7 +9,7 @@ use futures_util::{StreamExt, SinkExt};
 use crate::handlers::handle_message;
 use crate::performance_types::PerformanceState;
 
-/// Controls a TLS-enabled WebSocket server for real-time performances
+/// Controls a TLS-enabled WebSocket server and static file server for real-time performances
 pub struct ServerController {
     pub handle: Option<JoinHandle<()>>,
     pub state: Arc<Mutex<PerformanceState>>,
@@ -26,11 +26,11 @@ impl ServerController {
         }
     }
 
-    /// Start a WSS endpoint on the given port using Warp's built-in TLS
+    /// Start a WSS endpoint and serve static files on the given port using Warp's built-in TLS
     pub fn start_tls(&mut self, ws_port: u16) -> Result<(), String> {
         let state = self.state.clone();
 
-        // Define the WebSocket route
+        // Define the WebSocket route for /ws
         let ws_route = warp::path("ws")
             .and(warp::ws())
             .map(move |ws: warp::ws::Ws| {
@@ -53,27 +53,43 @@ impl ServerController {
                             if let Some(response) =
                                 handle_message(text, state.clone(), sender.clone()).await
                             {
+                                // Use sender.send, which is non-blocking for unbounded channel
                                 let _ = sender.send(Ok(response));
                             }
                         }
                     }
                 })
-            })
-            .with(warp::cors().allow_any_origin());
+            });
+
+        // Define the static files route
+        // This serves files from the specified directory for any path
+        // that doesn't match a preceding route.
+        // *** IMPORTANT: Adjust the path ("./static") based on where
+        // your frontend build outputs relative to the final executable. ***
+        let static_files_route = warp::fs::dir("./static"); // Example: assuming dist contents are copied to `./static`
+
+        // Combine the routes: Try WebSocket first, then static files for everything else
+        // The order matters: /ws must be checked before the static file server
+        let routes = ws_route.or(static_files_route);
+
+        // Apply CORS to the combined routes if needed (likely only relevant for the WSS)
+        let routes_with_cors = routes.with(warp::cors().allow_any_origin());
+
 
         let addr = SocketAddr::from(([0, 0, 0, 0], ws_port));
 
         // Launch the server with TLS
         let cert_path = "certs/cert.pem";
         let key_path = "certs/key.pem";
-        let server_future = warp::serve(ws_route)
+        let server_future = warp::serve(routes_with_cors) // Use the combined routes
             .tls()
             .cert_path(cert_path)
             .key_path(key_path)
             .run(addr);
 
         self.handle = Some(tokio::spawn(server_future));
-        println!("🟢 WSS listening on wss://{}", addr);
+        // Update the print message to reflect serving both
+        println!("🟢 WSS/HTTP listening on wss://{}", addr);
         Ok(())
     }
 
@@ -81,7 +97,7 @@ impl ServerController {
     pub fn stop(&mut self) {
         if let Some(handle) = self.handle.take() {
             handle.abort();
-            println!("🛑 WSS server stopped");
+            println!("🛑 WSS/HTTP server stopped");
         }
         if let Ok(mut state) = self.state.lock() {
             *state = PerformanceState::default();

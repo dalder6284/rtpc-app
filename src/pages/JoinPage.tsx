@@ -4,8 +4,8 @@ import ServerControls from "@/components/server/ServerControls"
 import ConnectionQR from "@/components/server/ConnectionQR"
 
 export default function JoinPage() {
-  const [wsPort, setWsPort] = useState(3030)
-  const [webPort, setWebPort] = useState(3031)
+  // Use a single state variable for the port
+  const [port, setPort] = useState(3030) // Choose a default port
   const [serverOn, setServerOn] = useState(false)
 
   const playMLSAtTime = async (playTime: number, beaconUrl: string) => {
@@ -34,6 +34,7 @@ export default function JoinPage() {
   }
 
   const handleBroadcast = () => {
+    // Schedule broadcast 3 seconds from now
     const playTime = (Date.now() + 3000) / 1000
 
     invoke("broadcast_json", {
@@ -46,6 +47,8 @@ export default function JoinPage() {
       },
     }).then(() => {
       console.log("Broadcast sent!")
+      // Note: /bandlimited_mls_15khz.wav is a relative path,
+      // it will fetch from the same origin the page was served from (https://ip:port)
       playMLSAtTime(playTime, "/bandlimited_mls_15khz.wav")
     }).catch((err) => {
       console.error("Failed to broadcast:", err)
@@ -57,10 +60,9 @@ export default function JoinPage() {
       {/* Top right: server controls */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
         <ServerControls
-          wsPort={wsPort}
-          webPort={webPort}
-          setWsPort={setWsPort}
-          setWebPort={setWebPort}
+          // Pass the single port state and setter
+          port={port}
+          setPort={setPort}
           serverOn={serverOn}
           setServerOn={setServerOn}
         />
@@ -68,7 +70,8 @@ export default function JoinPage() {
 
       {/* Center: QR code + button */}
       <div className="flex flex-col items-center justify-center h-full gap-4">
-        <ConnectionQR port={webPort} serverOn={serverOn} />
+        {/* Pass the single port to ConnectionQR */}
+        <ConnectionQR port={port} serverOn={serverOn} />
         <button
           onClick={handleBroadcast}
           className="px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/80 transition"
