@@ -46,17 +46,6 @@ To update the frontend React application used by Tauri:
 
 ---
 
-## About
-
-This system was developed as part of an undergraduate thesis project at Yale University.
-
-- **Author**: Diego Alderete Sanchez  
-- **Advisor**: Dr. Scott Petersen  
-- **Department**: Computer Science  
-- **Institution**: Yale University  
-- **Date**: April 2024
-
----
 
 ## Figures
 
@@ -83,3 +72,17 @@ This system was developed as part of an undergraduate thesis project at Yale Uni
 
 ![Two-Tone Spectrogram](figs/rtt_two_tone.png)  
 **Figure 7:** Spectrograms of three playback events recorded from two mobile clients with 10 ms and 9 ms RTTs. Despite slight network differences, tones remain visibly and audibly aligned across all events.
+
+---
+
+## About
+
+This system was developed as part of an undergraduate thesis project at Yale University.
+
+- **Author**: Diego Alderete Sanchez  
+- **Advisor**: Dr. Scott Petersen  
+- **Department**: Computer Science  
+- **Institution**: Yale University  
+- **Date**: April 2024
+
+---
