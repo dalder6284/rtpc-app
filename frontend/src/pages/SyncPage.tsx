@@ -7,7 +7,7 @@ import type {
   TimeSyncMessage,
   // RecordMessage,
   // RejoinRequestMessage,
-} from "@/context/MessageTypes"
+} from "@/types/MessageTypes"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Check } from "lucide-react"

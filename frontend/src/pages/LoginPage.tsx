@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { useNavigate } from "react-router-dom"
-import type { ServerToClientMessage } from "../context/MessageTypes"
+import type { ServerToClientMessage } from "../types/MessageTypes"
 
 
 export default function LoginPage() {
@@ -34,7 +34,7 @@ export default function LoginPage() {
 
     const id = localStorage.getItem("client_id")
     const seat = localStorage.getItem("client_seat")
-    const expiresAt = localStorage.getItem("client_expires_at") // ⚠️ match the actual storage key
+    const expiresAt = localStorage.getItem("client_expires_at")
 
     if (id && seat && expiresAt) {
       const expiration = parseInt(expiresAt)

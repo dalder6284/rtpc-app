@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { HashRouter as Router, Routes, Route } from "react-router-dom"
 import { WebSocketProvider } from "@/context/WebSocketProvider"
+import { IndexedDBProvider } from "@/context/IndexedDBProvider"
 import { Toaster } from "@/components/ui/sonner"
+
 
 import LoginPage from "@/pages/LoginPage"
 import SyncPage from "@/pages/SyncPage"
+import PlayPage from "@/pages/PlayPage"
 
 export default function App() {
   const [wsPort, setWsPort] = useState<number | null>(null)
@@ -20,13 +23,16 @@ export default function App() {
 
   return (
     <WebSocketProvider wsPort={wsPort}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/sync" element={<SyncPage />} />
-        </Routes>
-      </BrowserRouter>
-      <Toaster />
+      <IndexedDBProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/sync" element={<SyncPage />} />
+            <Route path="/play" element={<PlayPage />} />
+          </Routes>
+        </Router>
+        <Toaster />
+      </IndexedDBProvider>
     </WebSocketProvider>
   )
 }

@@ -1,28 +1,32 @@
 use std::{
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use warp::Filter;
 use futures_util::{StreamExt, SinkExt};
 
 use crate::handlers::handle_message;
 use crate::performance_types::PerformanceState;
+use crate::state::AppState;
 
 /// Controls a TLS-enabled WebSocket server and static file server for real-time performances
 pub struct ServerController {
     pub handle: Option<JoinHandle<()>>,
     pub state: Arc<Mutex<PerformanceState>>,
+    pub app_state: Arc<AppState>
 }
 
 impl ServerController {
     /// Create a new controller with a session TTL in milliseconds
-    pub fn new(ttl_ms: u64) -> Self {
+    pub fn new(ttl_ms: u64, app_state: Arc<AppState>) -> Self {
         let mut state = PerformanceState::default();
         state.session_ttl_ms = ttl_ms;
         ServerController {
             handle: None,
             state: Arc::new(Mutex::new(state)),
+            app_state
         }
     }
 
@@ -94,14 +98,14 @@ impl ServerController {
     }
 
     /// Stop the server and reset state
-    pub fn stop(&mut self) {
+    pub async fn stop(&mut self) {
         if let Some(handle) = self.handle.take() {
             handle.abort();
             println!("🛑 WSS/HTTP server stopped");
         }
-        if let Ok(mut state) = self.state.lock() {
-            *state = PerformanceState::default();
-        }
+    
+        let mut state = self.state.lock().await;
+        *state = PerformanceState::default();
     }
 }
 

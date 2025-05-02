@@ -3,10 +3,11 @@
 pub mod server_controller;
 pub mod performance_types;
 pub mod handlers;
-
+use std::sync::Arc;
 use local_ip_address::local_ip;
 use serde_json::Value;
 use tauri::State;
+use crate::state::AppState;
 
 use self::server_controller::{ServerController, ServerManager};
 use self::handlers::broadcast_to_all;
@@ -15,22 +16,23 @@ use self::handlers::broadcast_to_all;
 #[tauri::command]
 pub async fn start_server(
     manager: State<'_, ServerManager>,
+    app_state: State<'_, Arc<AppState>>,
     ws_port: u16,
     ttl_ms: u64,
 ) -> Result<(), String> {
-    let mut ctrl = ServerController::new(ttl_ms);
+    let mut ctrl = ServerController::new(ttl_ms, app_state.inner().clone());
     ctrl.start_tls(ws_port)?;
-    *manager.controller.lock().unwrap() = Some(ctrl);
+    *manager.controller.lock().await = Some(ctrl);
     Ok(())
 }
 
 // Stop the server and reset state
 #[tauri::command]
-pub fn stop_server(
-    manager: State<'_, ServerManager>
+pub async fn stop_server(
+    manager: State<'_, ServerManager>,
 ) -> Result<(), String> {
-    if let Some(ctrl) = manager.controller.lock().unwrap().as_mut() {
-        ctrl.stop();
+    if let Some(ctrl) = manager.controller.lock().await.as_mut() {
+        ctrl.stop().await;
         Ok(())
     } else {
         Err("Server not running".into())
@@ -47,12 +49,12 @@ pub fn get_local_ip() -> Result<String, String> {
 
 /// Broadcast a JSON payload to all connected clients
 #[tauri::command]
-pub fn broadcast_json(
+pub async fn broadcast_json(
     manager: State<'_, ServerManager>,
-    message: Value
+    message: Value,
 ) -> Result<(), String> {
-    if let Some(controller) = manager.controller.lock().unwrap().as_ref() {
-        broadcast_to_all(controller.state.clone(), message);
+    if let Some(controller) = manager.controller.lock().await.as_ref() {
+        broadcast_to_all(controller.state.clone(), message).await;
         Ok(())
     } else {
         Err("Server not running.".into())

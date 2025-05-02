@@ -1,7 +1,8 @@
 use crate::server_commands::performance_types::{ClientInfo, PerformanceState};
 use chrono::Utc;
 use serde_json::{json, Value};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 use warp::ws::Message;
 use uuid::Uuid;
@@ -24,8 +25,8 @@ pub async fn handle_message(
 
     match parsed.get("type").and_then(Value::as_str).unwrap_or("") {
         "ping" => Some(Message::text(r#"{"type":"pong"}"#)),
-        "j" => handle_join(&parsed, state.clone(), sender.clone()),
-        "rj" => handle_rejoin(&parsed, state.clone(), sender.clone()),
+        "j" => handle_join(&parsed, state.clone(), sender.clone()).await,
+        "rj" => handle_rejoin(&parsed, state.clone(), sender.clone()).await,
         "time_request" => handle_time_request(&parsed),
         _ => Some(Message::text(r#"{"type":"error","message":"Unknown message type"}"#)),
     }
@@ -45,9 +46,9 @@ fn handle_time_request(parsed: &Value) -> Option<Message> {
 }
 
 /// Handle a new client joining the session
-pub fn handle_join(
+pub async fn handle_join(
     parsed: &Value,
-    state: Arc<Mutex<PerformanceState>>,
+    state: Arc<tokio::sync::Mutex<PerformanceState>>,
     sender: UnboundedSender<Result<Message, warp::Error>>,
 ) -> Option<Message> {
     // Extract seat as String
@@ -57,26 +58,31 @@ pub fn handle_join(
         .map(str::to_string)
         .or_else(|| parsed.get("seat").and_then(Value::as_i64).map(|n| n.to_string()))
         .unwrap_or_else(|| "".to_string());
+
     if seat.is_empty() {
         let err = json!({"type":"error","message":"Invalid seat format"});
         return Some(Message::text(err.to_string()));
     }
 
-    // Create new client ID and expiration
-    let client_id = Uuid::new_v4().to_string();
-    let expires_at = Utc::now().timestamp_millis() as u64
-        + state.lock().ok()?.session_ttl_ms;
+    // Lock to access TTL and insert data
+    let mut locked = state.lock().await;
 
-    // Insert into state
-    let mut locked = state.lock().ok()?;
     if locked.seat_map.contains_key(&seat) {
         let err = json!({"type":"error","message":"Seat is already taken"});
         return Some(Message::text(err.to_string()));
     }
+
+    let client_id = Uuid::new_v4().to_string();
+    let expires_at = Utc::now().timestamp_millis() as u64 + locked.session_ttl_ms;
+
     locked.id_map.insert(client_id.clone(), seat.clone());
     locked.seat_map.insert(
         seat.clone(),
-        ClientInfo { id: client_id.clone(), expires_at, sender: Some(sender.clone()) },
+        ClientInfo {
+            id: client_id.clone(),
+            expires_at,
+            sender: Some(sender.clone()),
+        },
     );
 
     // Reply
@@ -86,13 +92,15 @@ pub fn handle_join(
         "seat": seat,
         "expiresAt": expires_at
     });
+
     Some(Message::text(resp.to_string()))
 }
 
+
 /// Handle a client rejoining an existing session
-pub fn handle_rejoin(
+pub async fn handle_rejoin(
     parsed: &Value,
-    state: Arc<Mutex<PerformanceState>>,
+    state: Arc<tokio::sync::Mutex<PerformanceState>>,
     sender: UnboundedSender<Result<Message, warp::Error>>,
 ) -> Option<Message> {
     // Extract client ID
@@ -102,7 +110,8 @@ pub fn handle_rejoin(
         return Some(Message::text(err.to_string()));
     }
 
-    let mut locked = state.lock().ok()?;
+    let mut locked = state.lock().await;
+
     // Retrieve seat for this client
     let seat = match locked.id_map.get(client_id) {
         Some(s) => s.clone(),
@@ -116,7 +125,11 @@ pub fn handle_rejoin(
     let expires_at = locked.seat_map.get(&seat)?.expires_at;
     locked.seat_map.insert(
         seat.clone(),
-        ClientInfo { id: client_id.to_string(), expires_at, sender: Some(sender.clone()) },
+        ClientInfo {
+            id: client_id.to_string(),
+            expires_at,
+            sender: Some(sender.clone()),
+        },
     );
 
     // Reply
@@ -126,22 +139,26 @@ pub fn handle_rejoin(
         "seat": seat,
         "expiresAt": expires_at
     });
+
     Some(Message::text(resp.to_string()))
 }
 
-/// Broadcast a JSON message to all connected clients
-pub fn broadcast_to_all(state: Arc<Mutex<PerformanceState>>, json_msg: Value) {
+pub async fn broadcast_to_all(state: Arc<tokio::sync::Mutex<PerformanceState>>, json_msg: Value) {
     let msg = match serde_json::to_string(&json_msg) {
         Ok(s) => Message::text(s),
         Err(_) => return,
     };
-    if let Ok(locked) = state.lock() {
-        for (seat, client_info) in locked.seat_map.iter() {
-            println!("[broadcast] seat={} sender_present={}", seat, client_info.sender.is_some());
-            if let Some(sender) = &client_info.sender {
-                if let Err(e) = sender.send(Ok(msg.clone())) {
-                    println!("[broadcast] failed to send to seat {}: {:?}", seat, e);
-                }
+
+    let locked = state.lock().await;
+    for (seat, client_info) in locked.seat_map.iter() {
+        println!(
+            "[broadcast] seat={} sender_present={}",
+            seat,
+            client_info.sender.is_some()
+        );
+        if let Some(sender) = &client_info.sender {
+            if let Err(e) = sender.send(Ok(msg.clone())) {
+                println!("[broadcast] failed to send to seat {}: {:?}", seat, e);
             }
         }
     }

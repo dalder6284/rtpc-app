@@ -4,6 +4,7 @@
 mod design_commands;
 mod server_commands;
 
+use std::sync::Arc;
 
 use state::AppState;
 use server_controller::ServerManager;
@@ -14,9 +15,11 @@ use tauri_plugin_dialog;
 
 
 fn main() {
+    let app_state = Arc::new(AppState::default());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState::default())
+        .manage(app_state)
         .manage(ServerManager::default())
         .invoke_handler(tauri::generate_handler![
             set_session_config,
