@@ -331,23 +331,33 @@ pub async fn handle_file_request(
     None
 }
 
-pub async fn broadcast_to_all(state: Arc<tokio::sync::Mutex<PerformanceState>>, json_msg: Value) {
+pub async fn broadcast_to_all(
+    state: Arc<Mutex<PerformanceState>>,
+    json_msg: Value
+) {
+    // 1. Serialize once
     let msg = match serde_json::to_string(&json_msg) {
         Ok(s) => Message::text(s),
-        Err(_) => return,
+        Err(e) => {
+            eprintln!("[broadcast] serialization error: {:?}", e);
+            return;
+        }
     };
 
-    let locked = state.lock().await;
-    for (seat, client_info) in locked.seat_map.iter() {
-        println!(
-            "[broadcast] seat={} sender_present={}",
-            seat,
-            client_info.sender.is_some()
-        );
-        if let Some(sender) = &client_info.sender {
-            if let Err(e) = sender.send(Ok(msg.clone())) {
-                println!("[broadcast] failed to send to seat {}: {:?}", seat, e);
-            }
+    // 2. Snapshot all senders under lock
+    let senders: Vec<_> = {
+        let locked = state.lock().await;
+        locked
+            .seat_map
+            .values()
+            .filter_map(|client_info| client_info.sender.clone())
+            .collect()
+    }; // lock is dropped here
+
+    // 3. Send to each client without holding the mutex
+    for sender in senders {
+        if let Err(e) = sender.send(Ok(msg.clone())) {
+            eprintln!("[broadcast] failed to send message: {:?}", e);
         }
     }
 }

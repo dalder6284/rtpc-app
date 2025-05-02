@@ -6,6 +6,7 @@ import "./index.css";
 import MainPage from "./pages/MainPage";
 import SessionPage from "./pages/SessionPage";
 import JoinPage from "./pages/JoinPage";
+import PlayPage from "./pages/PlayPage";
 
 // 👇 Add this import
 import { ThemeProvider } from "@/components/ui/theme-provider";
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
           <Route path="/" element={<MainPage />} />
           <Route path="/session" element={<SessionPage />} />
           <Route path="/join" element={<JoinPage />} />
+          <Route path="/play" element={<PlayPage />} />
         </Routes>
         <Toaster richColors position="bottom-right" />
       </BrowserRouter>

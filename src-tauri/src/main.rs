@@ -50,6 +50,7 @@ fn main() {
             stop_server,
             get_local_ip,
             broadcast_json,
+            broadcast_phase_start
         ])
         .run(tauri::generate_context!())
         .expect("Error while running Tauri application.");

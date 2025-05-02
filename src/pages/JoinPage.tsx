@@ -98,6 +98,14 @@ export default function JoinPage() {
         >
           Broadcast Test JSON
         </button> */}
+        <Button
+          size="sm"
+          variant="secondary"
+          className="text-white bg-blue-700 hover:bg-blue-600 opacity-80 hover:opacity-100 h-8 px-4 text-xs"
+          onClick={() => navigate("/play")}
+        >
+          Go to PlayPage
+        </Button>
       </div>
     </div>
   )
