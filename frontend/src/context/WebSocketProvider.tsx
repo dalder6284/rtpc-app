@@ -44,14 +44,39 @@ export function WebSocketProvider({ wsPort, children }: WebSocketProviderProps) 
     }
   }, [])
 
-  function _onMessage<T = unknown>(cb: (msg: T) => void) {
+  function _onMessage<T = unknown>(cb: (msg: T | ArrayBuffer) => void) {
     if (socketRef.current) {
-      socketRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data) as T
-        cb(data)
-      }
+      socketRef.current.onmessage = async (event) => {
+        let raw = event.data;
+  
+        // Convert Blob to ArrayBuffer for unified binary handling
+        if (raw instanceof Blob) {
+          raw = await raw.arrayBuffer();
+        }
+  
+        // Binary data: pass as-is
+        if (raw instanceof ArrayBuffer) {
+          cb(raw);
+          return;
+        }
+  
+        // String data: try to parse
+        if (typeof raw === "string") {
+          try {
+            const parsed = JSON.parse(raw) as T;
+            cb(parsed);
+          } catch (e) {
+            console.error("Failed to parse string as JSON:", e, raw);
+          }
+          return;
+        }
+  
+        console.warn("Unrecognized message type:", raw);
+      };
     }
   }
+  
+  
 
   const onMessage = useCallback(_onMessage, [])
 

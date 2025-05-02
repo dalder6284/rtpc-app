@@ -10,6 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Check } from "lucide-react"
 import { MissingFilesList } from "@/components/MissingFilesList"
+import { setupDevice, sendMIDI, notationToBeats } from "@/lib/music";
+import { SheetFile } from "@/types/SheetRNBOTypes"
+import { IPatcher } from "@rnbo/js"
+
+
 
 export default function PlayPage() {
   const { connected, send, onMessage } = useWebSocket()
@@ -18,8 +23,61 @@ export default function PlayPage() {
   const chunksByName = useRef<Record<string, ArrayBuffer[]>>({})
   const [missingPatchFiles, setMissingPatchFiles] = useState<string[]>([])
   const [missingSheetFiles, setMissingSheetFiles] = useState<string[]>([])
+  const [readySent, setReadySent] = useState(false)
   const requestedType = useRef<Record<string, "patch" | "sheet">>({})
   const navigate = useNavigate()
+
+  const [bpm, setBpm] = useState<number>(60);
+  const beatZeroRef = useRef<number>(0);
+  const timeOffsetRef = useRef<number>(0);
+  const schedulerID = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastScheduledBeat = useRef<number>(0);
+
+  function rollingScheduler(sheet: SheetFile, bpm: number, beatZero: number, offset: number) {
+    const beatDurationMs = (60 * 1000) / bpm;
+    const now = Date.now() + offset;
+    const currentBeat = (now - beatZero) / beatDurationMs;
+    const upperBeat = currentBeat + 2;
+
+    for (const track of sheet.tracks) {
+      for (const note of track.notes) {
+        if (note.start >= lastScheduledBeat.current && note.start < upperBeat) {
+          const durationInBeats = notationToBeats(note.duration);
+          sendMIDI(
+            note.pitch,
+            note.velocity,
+            durationInBeats,
+            note.start,
+            bpm,
+            now,
+            beatZero,
+            audioCtxRef.current!,
+            track.channel
+          );
+        }
+      }
+    }
+
+    if (lastScheduledBeat.current >= sheet.end_beat) {
+      if (schedulerID.current) clearInterval(schedulerID.current);
+      schedulerID.current = null;
+      lastScheduledBeat.current = 0;
+      console.log("[PlayPage] Scheduler finished.");
+    }
+
+    lastScheduledBeat.current = upperBeat;
+  }  
+
+
+  const storedOffset = localStorage.getItem("offset");
+  if (storedOffset) {
+    const parsedOffset = parseInt(storedOffset, 10);
+    if (!isNaN(parsedOffset)) {
+      timeOffsetRef.current = parsedOffset;
+    } else {
+      console.warn("Invalid offset value in localStorage:", storedOffset);
+    }
+  }
 
   useEffect(() => {
     if (connected) return
@@ -37,11 +95,11 @@ export default function PlayPage() {
 
     ctx.resume()
       .then(() => {
-        console.log("[NextPage] AudioContext running")
+        console.log("[PlayPage] AudioContext running")
         setAudioReady(true)
       })
       .catch((err) => {
-        console.warn("[NextPage] AudioContext resume failed:", err)
+        console.warn("[PlayPage] AudioContext resume failed:", err)
         setAudioReady(false)
       })
 
@@ -60,58 +118,70 @@ export default function PlayPage() {
     const id = localStorage.getItem("client_id")
 
     async function handleFileManifest(msg: FileManifestMessage) {
-      const patchMisses: string[] = []
+      const patchMisses: string[] = [];
+
       for (const { name, hash } of msg.patch_files) {
-        const data = await loadPatch(name)
+        const filename = name + ".json";
+        const data = await loadPatch(filename);
         if (!data) {
-          // never had it
-          patchMisses.push(name)
+          patchMisses.push(name);
         } else {
-          const localHash = await computeHash(data)
+          const localHash = await computeHash(data);
           if (localHash !== hash) {
-            // hash mismatch, need to redownload
-            patchMisses.push(name)
+            patchMisses.push(name);
           }
         }
-
-        const sheetMisses: string[] = []
-        for (const { name, hash } of msg.sheet_files) {
-          const data = await loadSheet(name)
-          if (!data) {
-            // never had it
-            sheetMisses.push(name)
-          } else {
-            const localHash = await computeHash(data)
-            if (localHash !== hash) {
-              // hash mismatch, need to redownload
-              sheetMisses.push(name)
-            }
-          }
-        }
-
-        setMissingPatchFiles(patchMisses)
-        setMissingSheetFiles(sheetMisses)
-
-        patchMisses.forEach((name) => {
-          requestedType.current[name] = "patch";
-          send({ type: "file_request", name, fileType: "patch" });
-        });
-        sheetMisses.forEach((name) => {
-          requestedType.current[name] = "sheet";
-          send({ type: "file_request", name, fileType: "sheet" });
-        });
       }
+
+      const sheetMisses: string[] = [];
+
+      for (const { name, hash } of msg.sheet_files) {
+        const filename = name + ".json";
+        const data = await loadSheet(filename);
+        if (!data) {
+          sheetMisses.push(name);
+        } else {
+          const localHash = await computeHash(data);
+          if (localHash !== hash) {
+            sheetMisses.push(name);
+          }
+        }
+      }
+
+      setMissingPatchFiles(patchMisses);
+      setMissingSheetFiles(sheetMisses);
+      setReadySent(true)
+
+      patchMisses.forEach((name) => {
+        requestedType.current[name] = "patch";
+        send({ type: "file_request", id: name, fileType: "patch" });
+      });
+
+      sheetMisses.forEach((name) => {
+        requestedType.current[name] = "sheet";
+        send({ type: "file_request", id: name, fileType: "sheet" });
+      });
     }
 
-    const unsub = onMessage<ServerToClientMessage | ArrayBuffer>(async (msg) => {
+
+    const unsub = onMessage<ServerToClientMessage | ArrayBuffer | Blob>(async (msg) => {
+      if (msg instanceof Blob) {
+        console.log("Received blob.")
+        msg = await msg.arrayBuffer()
+      }
+
       if (msg instanceof ArrayBuffer) {
         const view = new DataView(msg)
         const headerLen = view.getUint32(0, false)
         const headerBytes = new Uint8Array(msg.slice(4, 4 + headerLen))
         const headerText = new TextDecoder("utf-8").decode(headerBytes)
-        const { id: name, isLast } = JSON.parse(headerText) as {
+        console.log("Header length:", headerLen);
+        console.log("Header raw:", new Uint8Array(msg.slice(4, 4 + headerLen)));
+        console.log("Header text:", headerText);
+        const { id: name, fileType, isLast } = JSON.parse(headerText) as {
           id: string
           isLast: boolean
+          fileType: "patch" | "sheet"
         }
 
         const chunk = msg.slice(4 + headerLen)
@@ -123,16 +193,25 @@ export default function PlayPage() {
         chunksByName.current[name].push(chunk)
 
         if (isLast) {
+          console.log("Received last chunk for file:", name)
           // concatenate all the chunks into one ArrayBuffer
           const all = concatenate(chunksByName.current[name])
-          const type = requestedType.current[name]
+          const type = fileType || requestedType.current[name]
 
+          const text = new TextDecoder().decode(all);
+          let json;
+          try {
+            json = JSON.parse(text);
+          } catch (e) {
+            console.error("Failed to parse file as JSON:", e, text);
+            return;
+          }
           // update the correct “missing” state
           if (type === "patch") {
-            await savePatch(name, all)
+            await savePatch(name, json)
             setMissingPatchFiles((prev) => prev.filter((f) => f !== name))
           } else {
-            await saveSheet(name, all)
+            await saveSheet(name, json)
             setMissingSheetFiles((prev) => prev.filter((f) => f !== name))
           }
 
@@ -171,6 +250,79 @@ export default function PlayPage() {
     }
     return unsub
   }, [connected, send, onMessage, navigate])
+
+
+  // Wait to listen for phase starts from the server.
+  useEffect(() => {
+    if (!connected || !audioReady || !readySent || missingPatchFiles.length > 0 || missingSheetFiles.length > 0) {
+      return;
+    }
+
+    function startScheduler(sheet: SheetFile) {
+      if (schedulerID.current !== null) return;
+      schedulerID.current = setInterval(() => {
+        rollingScheduler(sheet, bpm, beatZeroRef.current, timeOffsetRef.current);
+      }, 200);
+    }
+
+    function stopScheduler() {
+      if (schedulerID.current) {
+        clearInterval(schedulerID.current);
+        schedulerID.current = null;
+      }
+    }
+
+    const unsub = onMessage<ServerToClientMessage>(async (msg) => {
+      if (msg instanceof Blob || msg instanceof ArrayBuffer) return;
+      if (msg.type === "phase_start") {
+
+        const { bpm: newBpm, start_time, assignments } = msg;
+        const seat = localStorage.getItem("client_seat");
+
+        if (!seat || !(seat in assignments)) {
+          console.warn("No assignment for this seat.");
+          return;
+        }
+
+        const { rnbo_id, sheet_id } = assignments[seat];
+
+        const patchBlob = await loadPatch(rnbo_id);
+        if (!patchBlob) {
+          console.warn("Patch not found");
+          return;
+        }
+        const patchJSON = patchBlob as unknown as IPatcher;
+        
+        const sheetBlob = await loadSheet(sheet_id);
+        if (!sheetBlob) {
+          console.warn("Sheet not found");
+          return;
+        }
+        const sheetJSON = sheetBlob as unknown as SheetFile;
+        
+
+        if (!patchJSON || !sheetJSON) {
+          console.warn("Missing patch or sheet.");
+          return;
+        }
+
+        // Apply state and synchronization
+        setBpm(newBpm);
+        beatZeroRef.current = start_time;
+        timeOffsetRef.current = start_time - Date.now();
+        lastScheduledBeat.current = 0;
+
+        // Start the RNBO device and scheduler
+        await setupDevice(audioCtxRef.current!, patchJSON);
+        startScheduler(sheetJSON);
+      } else if (msg.type === "phase_stop") {
+        stopScheduler();
+      }
+    });
+
+    return unsub;
+  }, [connected, onMessage, audioReady, readySent, missingPatchFiles, missingSheetFiles, bpm]);
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-black px-4">

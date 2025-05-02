@@ -37,6 +37,7 @@ function withStore<R>(
 }
 
 export function savePatch(name: string, data: Blob | ArrayBuffer) {
+    console.log("Saving patch", name, data)
     return withStore<IDBValidKey>("patches", "readwrite", (s) => s.put({ name, data }))
 }
 
@@ -47,6 +48,7 @@ export function loadPatch(name: string) {
 }
 
 export function saveSheet(name: string, data: Blob | ArrayBuffer) {
+    console.log("Saving sheet", name, data)
     return withStore<IDBValidKey>("sheetMusic", "readwrite", (s) => s.put({ name, data }))
 }
 

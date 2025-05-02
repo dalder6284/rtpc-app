@@ -164,8 +164,10 @@ export default function SyncPage() {
       }
     };
 
-    onMessage<TimeSyncMessage>(handleSync);
-
+    onMessage<TimeSyncMessage>((msg) => {
+      if (msg instanceof ArrayBuffer) return;
+      handleSync(msg);
+    });
     const sendReq = () => {
       if (!connected) return;
       const ts = Date.now();
@@ -439,7 +441,8 @@ export default function SyncPage() {
             <Button className="w-full" onClick={() => {
               // TODO: Navigate to the next page or signal readiness to the server
               console.log("[SyncPage] Synchronization complete. Ready to proceed!");
-              // Example: navigate("/room"); // Assuming you navigate to a room page
+              localStorage.setItem("offset", offset.toString())
+              navigate("/play"); // Assuming you navigate to a room page
               // OR send a message to the server like { type: "client_ready" }
               // Ensure you have sent the fine_sync_result before navigating if needed by server
             }}>

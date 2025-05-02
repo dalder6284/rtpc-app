@@ -1,11 +1,8 @@
-use std::{
-    net::SocketAddr,
-    sync::Arc,
-};
+use futures_util::{SinkExt, StreamExt};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use warp::Filter;
-use futures_util::{StreamExt, SinkExt};
 
 use crate::handlers::handle_message;
 use crate::performance_types::PerformanceState;
@@ -14,8 +11,8 @@ use crate::state::AppState;
 /// Controls a TLS-enabled WebSocket server and static file server for real-time performances
 pub struct ServerController {
     pub handle: Option<JoinHandle<()>>,
-    pub state: Arc<Mutex<PerformanceState>>,
-    pub app_state: Arc<AppState>
+    pub perf_state: Arc<Mutex<PerformanceState>>,
+    pub app_state: Arc<AppState>,
 }
 
 impl ServerController {
@@ -25,26 +22,29 @@ impl ServerController {
         state.session_ttl_ms = ttl_ms;
         ServerController {
             handle: None,
-            state: Arc::new(Mutex::new(state)),
-            app_state
+            perf_state: Arc::new(Mutex::new(state)),
+            app_state,
         }
     }
 
     /// Start a WSS endpoint and serve static files on the given port using Warp's built-in TLS
     pub fn start_tls(&mut self, ws_port: u16) -> Result<(), String> {
-        let state = self.state.clone();
+        let perf_state = self.perf_state.clone();
+        let app_state = self.app_state.clone();
 
         // Define the WebSocket route for /ws
         let ws_route = warp::path("ws")
             .and(warp::ws())
             .map(move |ws: warp::ws::Ws| {
-                let state = state.clone();
+                let perf_state = perf_state.clone();
+                let app_state = app_state.clone();
                 ws.on_upgrade(move |socket| async move {
                     let (mut tx, mut rx) = socket.split();
-                    let (sender, mut receiver) =
-                        tokio::sync::mpsc::unbounded_channel::<Result<warp::ws::Message, warp::Error>>();
+                    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<
+                        Result<warp::ws::Message, warp::Error>,
+                    >();
 
-                    // Spawn writer task
+                    // Writer task
                     tokio::spawn(async move {
                         while let Some(Ok(msg)) = receiver.recv().await {
                             let _ = tx.send(msg).await;
@@ -54,10 +54,14 @@ impl ServerController {
                     // Reader loop
                     while let Some(Ok(msg)) = rx.next().await {
                         if let Ok(text) = msg.to_str() {
-                            if let Some(response) =
-                                handle_message(text, state.clone(), sender.clone()).await
+                            if let Some(response) = handle_message(
+                                text,
+                                perf_state.clone(),
+                                app_state.clone(),
+                                sender.clone(),
+                            )
+                            .await
                             {
-                                // Use sender.send, which is non-blocking for unbounded channel
                                 let _ = sender.send(Ok(response));
                             }
                         }
@@ -65,34 +69,19 @@ impl ServerController {
                 })
             });
 
-        // Define the static files route
-        // This serves files from the specified directory for any path
-        // that doesn't match a preceding route.
-        // *** IMPORTANT: Adjust the path ("./static") based on where
-        // your frontend build outputs relative to the final executable. ***
-        let static_files_route = warp::fs::dir("./static"); // Example: assuming dist contents are copied to `./static`
-
-        // Combine the routes: Try WebSocket first, then static files for everything else
-        // The order matters: /ws must be checked before the static file server
+        let static_files_route = warp::fs::dir("./static");
         let routes = ws_route.or(static_files_route);
-
-        // Apply CORS to the combined routes if needed (likely only relevant for the WSS)
         let routes_with_cors = routes.with(warp::cors().allow_any_origin());
-
 
         let addr = SocketAddr::from(([0, 0, 0, 0], ws_port));
 
-        // Launch the server with TLS
-        let cert_path = "certs/cert.pem";
-        let key_path = "certs/key.pem";
-        let server_future = warp::serve(routes_with_cors) // Use the combined routes
+        let server_future = warp::serve(routes_with_cors)
             .tls()
-            .cert_path(cert_path)
-            .key_path(key_path)
+            .cert_path("certs/cert.pem")
+            .key_path("certs/key.pem")
             .run(addr);
 
         self.handle = Some(tokio::spawn(server_future));
-        // Update the print message to reflect serving both
         println!("🟢 WSS/HTTP listening on wss://{}", addr);
         Ok(())
     }
@@ -103,8 +92,8 @@ impl ServerController {
             handle.abort();
             println!("🛑 WSS/HTTP server stopped");
         }
-    
-        let mut state = self.state.lock().await;
+
+        let mut state = self.perf_state.lock().await;
         *state = PerformanceState::default();
     }
 }

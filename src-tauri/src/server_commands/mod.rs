@@ -54,9 +54,10 @@ pub async fn broadcast_json(
     message: Value,
 ) -> Result<(), String> {
     if let Some(controller) = manager.controller.lock().await.as_ref() {
-        broadcast_to_all(controller.state.clone(), message).await;
+        broadcast_to_all(controller.perf_state.clone(), message).await;
         Ok(())
     } else {
         Err("Server not running.".into())
     }
 }
+

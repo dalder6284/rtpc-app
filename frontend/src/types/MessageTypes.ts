@@ -67,6 +67,20 @@ export type FileRequestMessage = {
     fileType: "patch" | "sheet";
 };
 
+export type PhaseStartMessage = {
+    type: "phase_start";
+    bpm: number;
+    start_time: number; // UNIX ms timestamp
+    assignments: Record<string, {
+        rnbo_id: string;
+        sheet_id: string;
+    }>;
+};
+
+export type PhaseStopMessage = {
+    type: "phase_stop";
+}
+
 // Error and misc.
 export type ErrorMessage = {
     type: "error";
@@ -82,8 +96,6 @@ export type PongMessage = {
 };
 
 
-
-
 // Message types for the server to client and client to server messages
 export type ServerToClientMessage =
     | TimeSyncMessage
@@ -91,7 +103,9 @@ export type ServerToClientMessage =
     | RecordMessage
     | ErrorMessage
     | PongMessage
-    | FileManifestMessage;
+    | FileManifestMessage
+    | PhaseStartMessage
+    | PhaseStopMessage;
 
 export type ClientToServerMessage =
     | TimeRequestMessage

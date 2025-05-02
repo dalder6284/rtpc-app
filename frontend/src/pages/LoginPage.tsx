@@ -57,6 +57,8 @@ export default function LoginPage() {
     if (!connected) return
 
     const unsubscribe = onMessage<ServerToClientMessage>((msg) => {
+      if (msg instanceof ArrayBuffer) return; // ignore binary data here
+
       console.log("Received message:", msg)
 
       if (msg.type === "joined") {
