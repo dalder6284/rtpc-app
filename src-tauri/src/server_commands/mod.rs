@@ -24,7 +24,7 @@ pub async fn start_server(
     Ok(())
 }
 
-/// Stop the server and reset state
+// Stop the server and reset state
 #[tauri::command]
 pub fn stop_server(
     manager: State<'_, ServerManager>

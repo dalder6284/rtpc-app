@@ -1,10 +1,9 @@
-import { toast } from "sonner"
-import { invoke } from "@tauri-apps/api/core"
 import { Power, Settings } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useServerToggle } from "@/lib/hooks/useServerToggle"
 import {
   Tooltip,
   TooltipContent,
@@ -24,32 +23,10 @@ type ServerControlsProps = {
 export default function ServerControls({ port, setPort, serverOn, setServerOn }: ServerControlsProps) {
   const [sessionTtlMinutes, setSessionTtlMinutes] = useState(60) // default 60 minutes
   const [connecting, setConnecting] = useState(false)
+  const { toggleServer } = useServerToggle()
 
   const handleToggle = async () => {
-    if (serverOn) {
-      await invoke("stop_server")
-      toast("Server stopped.")
-      setServerOn(false)
-    } else {
-      setConnecting(true)
-
-      try {
-        // Pass only the single port to the Rust backend
-        await invoke("start_server", {
-          // host: "127.0.0.1", // Host remains the same
-          wsPort: port,       // Use the single port variable
-          ttlMs: sessionTtlMinutes * 60_000,
-        })
-
-        setServerOn(true)
-        toast("Server started.")
-      } catch (err) {
-        toast.error("Failed to start server.")
-        console.error(err)
-      } finally {
-        setConnecting(false)
-      }
-    }
+    toggleServer({ port, ttlMinutes: sessionTtlMinutes, setServerOn, setConnecting }, serverOn)
   }
 
   return (
