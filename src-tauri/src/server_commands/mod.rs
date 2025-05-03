@@ -100,6 +100,7 @@ pub async fn broadcast_phase_start(
     let payload = PhaseStartPayload {
       msg_type: "phase_start",
       bpm: phase.bpm,
+      count_in: phase.count_in,
       start_time,
       assignments,
     };

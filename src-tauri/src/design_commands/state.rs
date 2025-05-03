@@ -102,6 +102,7 @@ pub struct PhaseStartPayload {
   #[serde(rename = "type")]
   pub msg_type: &'static str,
   pub bpm: u32,
+  pub count_in: u32,
   pub start_time: i64,
   pub assignments: HashMap<String, AssignmentPayload>,
 }

@@ -13,39 +13,47 @@ RTPC is built using [Tauri](https://tauri.app/) and a React frontend. To run the
 ```bash
 npm install
 npm update
+npm run tauri:dev
+```
+
+This will launch the Tauri application, including launching the Tauri administrator application and compiling the client's frontend interface that the application serves.
+
+I also recommend navigating to the frontend directory and running
+```bash
+npm install
+npm update
+npm run dev
+```
+as a sanity check. Then `npm run tauri:dev` should compile a static frontend for the Tauri Application to serve each time you run it. If you'd like to just run the Tauri application without compiling the static files, you can run
+```bash
 npm run tauri dev
 ```
 
-This will launch the Tauri application, including both the server backend and the local frontend interface.
+This is all assuming you have Tauri and NPM installed, of course.
 
----
+## Notes on development
 
-## Frontend Build Process
+### Autocorrelation
 
-To update the frontend React application used by Tauri:
+While I was unsuccessful in my attempt to run autocorrelation, I've included some proof of concepts. In the `testing_ac`, I included a sample buffer (`buffer.json`) recorded by a device as the acoustic beacon played from the Tauri application. The `reference_mls.json` is the reference signal in the same format as `buffer.json`. The `testing_ac.py` script runs the autocorrelation and shows a notable spike. The spike's index is the offset from start of recording to detection of the signal.
 
-1. Navigate into the frontend directory:
+There are some vestigial files throughout the project showing my attempt at autocorrelation as well as some uncommented `useEffects`. However, these shouldn't interfere with the current coarse synchronization method.
 
-   ```bash
-   cd frontend
-   ```
+### Example RNBO patches and sheets
 
-2. Build the frontend assets:
+The application uses its own standard for interpreting sheet music JSON files. An example of these can be found in `example_assets/sheets`. The RNBO patches are MaxMSP-like patches that one can export as portable code, and thus, they are particularly suitable for the task of browser-based audio diffusion.
 
-   ```bash
-   npm run build
-   ```
+In `example_assets/devices`, you'll find an additive synthesis instrument exported from Max's official RNBO example library. `bach` and `mary` in sheets are a Bach Prelude and a C major scale, respectively. `mega`, `mega_0`, and `mega_1` are three different overlaying tracks of Toby Fox's Megalovania.
 
-3. The output will be placed in:
+I've also included a script (`example_assets/extract_midi.py`) that will generate a JSON of this format usable by the Tauri application from a MIDI file.
 
-   ```
-   src-tauri/static/
-   ```
+### Local Testing
 
-   This directory is used by the Tauri backend to serve static assets to mobile clients.
+For local testing or deployment over HTTPS, you'll need a valid SSL certificate. For development or LAN-only setups, you can generate a self-signed certificate using OpenSSL. Keep in mind that modern browsers often reject connections to http:// on mobile when the page is served from a QR code or outside localhost. To get aroudn this, you can run your server with HTTPS and instruct users to click through the "Advanced" warning in their browser when connecting (most will show an option like "Proceed to site anyway" or something along those lines after seeing the cert warning). This should be fine for local demos. 
 
----
+This step is necessary unless you've installed and trusted your certificate manually on the client device, which is more involved and generally not worth it for short-term usage. 
 
+You can include the `key.pem` and `cert.pem` in `src-tauri/certs`, and also just inside `frontend` (same level as `index.html`).
 
 ## Figures
 
@@ -62,16 +70,19 @@ To update the frontend React application used by Tauri:
 
 ![QR Code Screen](figs/qr-screen.png)  
 **Figure 4:** QR code display for mobile client onboarding. Clients use their browsers to connect to the RTPC web session.
+![Phase Play Screen](figs/phase-start-screen.png)  
+**Figure 6:** Phase selection screen for starting playback on all connected devices. The play button will immediately start the count-in for the devices to play.
 
-<img src="figs/mobile-home.png" alt="Mobile Join Screen" width="300" />  
-**Figure 5:** Mobile client login screen for audience members to enter their assigned seat number and begin synchronization.
+<img src="figs/mobile-home.png" alt="Mobile Join Screen" width="300" /> 
+
+**Figure 7:** Mobile client login screen for audience members to enter their assigned seat number and begin synchronization.
 
 ### Synchronization Results
 ![RTT Plot](figs/rtt_plot.png)  
-**Figure 6:** RTT samples over time during coarse synchronization. After 142 samples, RTT stabilized to 9.0 ms, allowing for a coarse synchronization tolerance of 4.5 ms.
+**Figure 8:** RTT samples over time during coarse synchronization. After 142 samples, RTT stabilized to 9.0 ms, allowing for a coarse synchronization tolerance of 4.5 ms.
 
 ![Two-Tone Spectrogram](figs/rtt_two_tone.png)  
-**Figure 7:** Spectrograms of three playback events recorded from two mobile clients with 10 ms and 9 ms RTTs. Despite slight network differences, tones remain visibly and audibly aligned across all events.
+**Figure 9:** Spectrograms of three playback events recorded from two mobile clients with 10 ms and 9 ms RTTs. Despite slight network differences, tones remain visibly and audibly aligned across all events.
 
 ---
 

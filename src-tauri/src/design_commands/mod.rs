@@ -85,14 +85,14 @@ pub async fn get_app_state(state: tauri::State<'_, Arc<AppState>>) -> Result<ser
 
 
 #[tauri::command]
-pub async fn set_session_config(state: State<'_, AppState>, config: SessionConfig) -> Result<(), ()> {
+pub async fn set_session_config(state: tauri::State<'_, Arc<AppState>>, config: SessionConfig) -> Result<(), ()> {
     let mut session = state.session.lock().await;
     *session = Some(config);
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_session_config(state: State<'_, AppState>) -> Result<Option<SessionConfig>, ()> {
+pub async fn get_session_config(state: tauri::State<'_, Arc<AppState>>) -> Result<Option<SessionConfig>, ()> {
     let session = state.session.lock().await;
     Ok(session.clone())
 }
@@ -102,7 +102,7 @@ pub async fn get_session_config(state: State<'_, AppState>) -> Result<Option<Ses
 //
 
 #[tauri::command]
-pub async fn add_phase(state: State<'_, AppState>, data: PhaseInit) -> Result<(), String> {
+pub async fn add_phase(state: tauri::State<'_, Arc<AppState>>, data: PhaseInit) -> Result<(), String> {
     let mut phases = state.phases.lock().await;
 
     if phases.contains_key(&data.id) {
@@ -142,7 +142,7 @@ pub async fn add_phase(state: State<'_, AppState>, data: PhaseInit) -> Result<()
 
 
 #[tauri::command]
-pub async fn remove_phase(state: State<'_, AppState>, phase_id: String) -> Result<(), String> {
+pub async fn remove_phase(state: tauri::State<'_, Arc<AppState>>, phase_id: String) -> Result<(), String> {
     let mut phases = state.phases.lock().await;
 
     if phases.remove(&phase_id).is_none() {
@@ -191,7 +191,7 @@ pub async fn edit_phase(
 #[tauri::command]
 pub async fn set_current_phase(
     app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    state: tauri::State<'_, Arc<AppState>>,
     phase_id: String,
 ) -> Result<(), String> {
     let phases = state.phases.lock().await;
@@ -259,7 +259,7 @@ pub async fn add_rnbo_file(state: tauri::State<'_, Arc<AppState>>, item: RNBOPal
 #[tauri::command]
 pub async fn remove_rnbo_file(
     app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    state: tauri::State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<(), String> {
     let mut patches = state.rnbo_patches.lock().await;
@@ -403,7 +403,7 @@ pub async fn assign_selected_file_to_seat(
 
 #[tauri::command]
 pub async fn unassign_file_from_seat(
-    state: State<'_, AppState>,
+    state: tauri::State<'_, Arc<AppState>>,
     phase_id: String,
     seat_index: usize,
     file_type: String,

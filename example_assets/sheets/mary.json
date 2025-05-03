@@ -1,0 +1,20 @@
+{
+  "bpm": 100,
+  "end_beat": 8,
+  "tracks": [
+    {
+      "instrument": "melody",
+      "channel": 0,
+      "notes": [
+        { "pitch": 60, "velocity": 100, "start": 0, "duration": "4n" },
+        { "pitch": 62, "velocity": 100, "start": 1, "duration": "4n" },
+        { "pitch": 64, "velocity": 100, "start": 2, "duration": "4n" },
+        { "pitch": 65, "velocity": 100, "start": 3, "duration": "4n" },
+        { "pitch": 67, "velocity": 100, "start": 4, "duration": "4n" },
+        { "pitch": 69, "velocity": 100, "start": 5, "duration": "4n" },
+        { "pitch": 71, "velocity": 100, "start": 6, "duration": "4n" },
+        { "pitch": 72, "velocity": 100, "start": 7, "duration": "4n" }
+      ]
+    }
+  ]
+}

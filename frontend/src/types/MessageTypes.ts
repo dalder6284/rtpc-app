@@ -70,6 +70,7 @@ export type FileRequestMessage = {
 export type PhaseStartMessage = {
     type: "phase_start";
     bpm: number;
+    count_in: number;
     start_time: number; // UNIX ms timestamp
     assignments: Record<string, {
         rnbo_id: string;

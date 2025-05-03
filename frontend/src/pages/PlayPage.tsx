@@ -33,40 +33,51 @@ export default function PlayPage() {
   const schedulerID = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastScheduledBeat = useRef<number>(0);
 
-  function rollingScheduler(sheet: SheetFile, bpm: number, beatZero: number, offset: number) {
-    const beatDurationMs = (60 * 1000) / bpm;
-    const now = Date.now() + offset;
-    const currentBeat = (now - beatZero) / beatDurationMs;
-    const upperBeat = currentBeat + 2;
+  function rollingScheduler(sheet: SheetFile, bpm: number, beatZeroAudioMs: number) {
+    const ctx = audioCtxRef.current!
+    const beatDurationMs = (60 * 1000) / bpm
+    // current time in audio context, in ms
+    const nowAudioMs = ctx.currentTime * 1000
+    const currentBeat = (nowAudioMs - beatZeroAudioMs) / beatDurationMs
+    const upperBeat = currentBeat + 2
+
+    console.log("Rolling scheduler:", {
+      nowAudioMs,
+      beatZeroAudioMs,
+      currentBeat,
+      upperBeat,
+      lastScheduledBeat: lastScheduledBeat.current,
+      bpm,
+      beatDurationMs,
+      timeOffset: timeOffsetRef.current,
+    }) 
 
     for (const track of sheet.tracks) {
       for (const note of track.notes) {
         if (note.start >= lastScheduledBeat.current && note.start < upperBeat) {
-          const durationInBeats = notationToBeats(note.duration);
+          const durBeats = notationToBeats(note.duration)
           sendMIDI(
             note.pitch,
             note.velocity,
-            durationInBeats,
+            durBeats,
             note.start,
             bpm,
-            now,
-            beatZero,
-            audioCtxRef.current!,
+            nowAudioMs,
+            beatZeroAudioMs,
+            ctx,
             track.channel
-          );
+          )
         }
       }
     }
 
     if (lastScheduledBeat.current >= sheet.end_beat) {
-      if (schedulerID.current) clearInterval(schedulerID.current);
-      schedulerID.current = null;
-      lastScheduledBeat.current = 0;
-      console.log("[PlayPage] Scheduler finished.");
+      if (schedulerID.current) clearInterval(schedulerID.current)
+      schedulerID.current = null
+      lastScheduledBeat.current = 0
     }
-
-    lastScheduledBeat.current = upperBeat;
-  }  
+    lastScheduledBeat.current = upperBeat
+  }
 
 
   const storedOffset = localStorage.getItem("offset");
@@ -261,7 +272,7 @@ export default function PlayPage() {
     function startScheduler(sheet: SheetFile) {
       if (schedulerID.current !== null) return;
       schedulerID.current = setInterval(() => {
-        rollingScheduler(sheet, bpm, beatZeroRef.current, timeOffsetRef.current);
+        rollingScheduler(sheet, bpm, beatZeroRef.current);
       }, 200);
     }
 
@@ -275,46 +286,31 @@ export default function PlayPage() {
     const unsub = onMessage<ServerToClientMessage>(async (msg) => {
       if (msg instanceof Blob || msg instanceof ArrayBuffer) return;
       if (msg.type === "phase_start") {
+        console.log("Received phase start message:", msg)
+        const { bpm: newBpm, start_time, count_in, assignments } = msg
+        const seat = localStorage.getItem("client_seat")!
+        if (!assignments[seat]) return
+        const { rnbo_id, sheet_id } = assignments[seat]
 
-        const { bpm: newBpm, start_time, assignments } = msg;
-        const seat = localStorage.getItem("client_seat");
+        // Load patch & sheet
+        const patchBlob = await loadPatch(rnbo_id); if (!patchBlob) return
+        const sheetBlob = await loadSheet(sheet_id); if (!sheetBlob) return
+        const patchJSON = patchBlob as unknown as IPatcher
+        const sheetJSON = sheetBlob as unknown as SheetFile
 
-        if (!seat || !(seat in assignments)) {
-          console.warn("No assignment for this seat.");
-          return;
-        }
+        // convert wall-clock start_time to audio clock ms
+        const ctx = audioCtxRef.current!
+        const audioNowMs = ctx.currentTime * 1000
+        const wallNowMs = Date.now()
+        // audio-based beat zero time
+        const startAudioMs = audioNowMs + (start_time - wallNowMs) + count_in * ((60*1000)/newBpm)
+        beatZeroRef.current = startAudioMs
 
-        const { rnbo_id, sheet_id } = assignments[seat];
+        setBpm(newBpm)
+        lastScheduledBeat.current = 0
 
-        const patchBlob = await loadPatch(rnbo_id);
-        if (!patchBlob) {
-          console.warn("Patch not found");
-          return;
-        }
-        const patchJSON = patchBlob as unknown as IPatcher;
-        
-        const sheetBlob = await loadSheet(sheet_id);
-        if (!sheetBlob) {
-          console.warn("Sheet not found");
-          return;
-        }
-        const sheetJSON = sheetBlob as unknown as SheetFile;
-        
-
-        if (!patchJSON || !sheetJSON) {
-          console.warn("Missing patch or sheet.");
-          return;
-        }
-
-        // Apply state and synchronization
-        setBpm(newBpm);
-        beatZeroRef.current = start_time;
-        timeOffsetRef.current = start_time - Date.now();
-        lastScheduledBeat.current = 0;
-
-        // Start the RNBO device and scheduler
-        await setupDevice(audioCtxRef.current!, patchJSON);
-        startScheduler(sheetJSON);
+        await setupDevice(ctx, patchJSON)
+        startScheduler(sheetJSON)
       } else if (msg.type === "phase_stop") {
         stopScheduler();
       }
